@@ -1,0 +1,276 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Share grants with accounts in certain OUs ().
+
+Parameters:
+  OUsToShareWith:
+    Description: (ou-aaaa-bbbbcccc)Comma seperated list of Organizations Unit Ids. Retrieve from https://console.aws.amazon.com/organizations/
+    #AllowedPattern: ^ou-[0-9a-z]{4,32}-[a-z0-9]{8,32}$
+    Type: String
+    Default: "ou-b0w2-vt5507ez,ou-b0w2-ko2o2ieh"
+  ProductSKU:
+    Description: Product ID of AWS MP Listing. Retrieve from AWS Marketplace, Manage subscriptions, SUSE Linux Enterprise Server for SAP Applications 15 SP1
+    Type: String
+    Default: '36451a0a-c7b9-4ee2-bb36-1192921c6337'
+  SourceS3BucketName:
+    Type: String
+    Default: vinjak-outbox
+    Description: "S3 bucket for Quick Start assets. Use this if you want to customize your deployment. The bucket name can include numbers, lowercase letters, uppercase letters, and hyphens, but it cannot start or end with hyphens (-)."
+  SourceS3KeyPrefix:
+    Type: String
+    Default: mpct-sles/
+    Description: "S3 key prefix to simulate a directory for Quick Start assets. Use this if you want to customize your deployment. The prefix can include numbers, lowercase letters, uppercase letters, hyphens (-), and forward slashes (/). For more information, see https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingMetadata.html."
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: AWS Marketplace Subscription details
+        Parameters:
+          - ProductSKU
+      - Label:
+          default: AWS Organization details
+        Parameters:
+          - OUsToShareWith
+      - Label:
+          default: Source S3 Bucket location
+        Parameters:
+          - SourceS3BucketName
+          - SourceS3KeyPrefix
+Mappings:
+  SLESProductId:
+    ParameterStore:
+      ParameterName: "/sles-awsmp/product-sku"
+  AllowedOUList:
+    ParameterStore:
+      ParameterName: "/sles-awsmp/ou-list"
+
+Resources:
+  LambdaZipsBucket:
+    Type: AWS::S3::Bucket
+
+  CopyZips:
+    Type: Custom::CopyZips
+    Properties:
+      ServiceToken: !GetAtt 'CopyZipsFunction.Arn'
+      DestBucket: !Ref 'LambdaZipsBucket'
+      SourceBucket: !Ref 'SourceS3BucketName'
+      Prefix: !Ref 'SourceS3KeyPrefix'
+      Objects:
+        - 'functions/packages/create_grants.zip'
+
+  CopyZipsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Path: /
+      Policies:
+        - PolicyName: lambda-copier
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectTagging
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:s3:::${SourceS3BucketName}/${SourceS3KeyPrefix}*'
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:PutObjectTagging
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:s3:::${LambdaZipsBucket}/${SourceS3KeyPrefix}*'
+
+  CopyZipsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Copies objects from the S3 bucket to a new location.
+      Handler: index.handler
+      Runtime: python3.7
+      Role: !GetAtt 'CopyZipsRole.Arn'
+      Timeout: 240
+      Code:
+        ZipFile: |
+          import json
+          import logging
+          import threading
+          import boto3
+          import cfnresponse
+          def copy_objects(source_bucket, dest_bucket, prefix, objects):
+              s3 = boto3.client('s3')
+              for o in objects:
+                  key = prefix + o
+                  copy_source = {
+                      'Bucket': source_bucket,
+                      'Key': key
+                  }
+                  print('copy_source: %s' % copy_source)
+                  print('dest_bucket = %s'%dest_bucket)
+                  print('key = %s' %key)
+                  s3.copy_object(CopySource=copy_source, Bucket=dest_bucket,
+                        Key=key)
+          def delete_objects(bucket, prefix, objects):
+              s3 = boto3.client('s3')
+              objects = {'Objects': [{'Key': prefix + o} for o in objects]}
+              s3.delete_objects(Bucket=bucket, Delete=objects)
+          def timeout(event, context):
+              logging.error('Execution is about to time out, sending failure response to CloudFormation')
+              cfnresponse.send(event, context, cfnresponse.FAILED, {}, None)
+          def handler(event, context):
+              # make sure we send a failure to CloudFormation if the function
+              # is going to timeout
+              timer = threading.Timer((context.get_remaining_time_in_millis()
+                        / 1000.00) - 0.5, timeout, args=[event, context])
+              timer.start()
+              print('Received event: %s' % json.dumps(event))
+              status = cfnresponse.SUCCESS
+              try:
+                  source_bucket = event['ResourceProperties']['SourceBucket']
+                  dest_bucket = event['ResourceProperties']['DestBucket']
+                  prefix = event['ResourceProperties']['Prefix']
+                  objects = event['ResourceProperties']['Objects']
+                  if event['RequestType'] == 'Delete':
+                      delete_objects(dest_bucket, prefix, objects)
+                  else:
+                      copy_objects(source_bucket, dest_bucket, prefix, objects)
+              except Exception as e:
+                  logging.error('Exception: %s' % e, exc_info=True)
+                  status = cfnresponse.FAILED
+              finally:
+                  timer.cancel()
+                  cfnresponse.send(event, context, status, {}, None)
+
+  AllowedOUList:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: "List of OUs to share accounts the SLES AWSMP Subscription"
+      Name: !FindInMap ["AllowedOUList", "ParameterStore", "ParameterName"]
+      Type: "String"
+      Value: !Ref OUsToShareWith
+
+  SLESProductID:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: "SLES Product Id"
+      Name: !FindInMap ["SLESProductId", "ParameterStore", "ParameterName"]
+      Type: "String"
+      Value: !Ref ProductSKU
+
+  SLESCaptureControlTowerLifeCycleEvents:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Capture Control Tower LifeCycle Events for SUSE and Trigger an Action
+      EventPattern:
+        detail:
+          eventName:
+          - CreateManagedAccount
+          - UpdateManagedAccount
+          eventSource:
+          - controltower.amazonaws.com
+        detail-type:
+        - AWS Service Event via CloudTrail
+        source:
+        - aws.controltower
+      State: ENABLED
+      Targets:
+      - Arn: !GetAtt "SLESCreateGrantLambdaFunction.Arn"
+        Id: IDCaptureControlTowerLifeCycleEvents
+
+  SLESCreateGrantLambdaFunction:
+    DependsOn: CopyZips
+    Type: AWS::Lambda::Function
+    Properties:
+      Environment:
+        Variables:
+          OU_PRM: !Ref AllowedOUList
+          SKU_PRM: !Ref SLESProductID
+      Code:
+        S3Bucket: !Ref LambdaZipsBucket
+        S3Key: !Join ['', [!Ref 'SourceS3KeyPrefix', 'functions/packages/create_grants.zip']]
+      Handler: create_grants.lambda_handler
+      MemorySize: 128
+      Role: !GetAtt "SLESCreateGrantLambdaRole.Arn"
+      Runtime: python3.8
+      Timeout: 300
+
+  SLESCreateGrantLambdaRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: AllowLambdaAssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: SLESCreateGrantsPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: '1'
+                Effect: Allow
+                Action:
+                  - 'license-manager:CreateGrantVersion'
+                  - 'license-manager:CreateLicenseVersion'
+                  - 'license-manager:CreateGrant'
+                  - 'license-manager:DeleteGrant'
+                  - 'license-manager:DeleteLicense'
+                  - 'license-manager:DeleteLicenseConfiguration'
+                  - 'license-manager:GetLicenseUsage'
+                  - 'license-manager:GetLicense'
+                  - 'license-manager:ListLicenseVersions'
+                  - 'license-manager:GetGrant'
+                Resource: 
+                  - 'arn:aws:license-manager::*:grant:*'
+                  - 'arn:aws:license-manager::*:license:*'
+                  - 'arn:aws:license-manager:*:*:license-configuration:*'
+              - Sid: '2'
+                Effect: Allow
+                Action:
+                  - 'license-manager:ListDistributedGrants'
+                  - 'license-manager:GetLicenseConversionTask'
+                  - 'license-manager:ListLicenses'
+                  - 'license-manager:ListReceivedGrants'
+                  - 'organizations:ListAccounts'
+                  - 'sts:AssumeRole'
+                Resource: '*'
+              - Sid: '3'
+                Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                Resource:
+                  - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/sles-awsmp/*'
+              - Sid: '4'
+                Effect: Allow
+                Action:
+                  - 'organizations:ListAccountsForParent'
+                Resource:
+                  - 'arn:aws:organizations::*:root/o-*/r-*'
+                  - 'arn:aws:organizations::*:ou/o-*/ou-*'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/CloudWatchLogsFullAccess
+
+  PermissionForEventsToInvokeLambdachk:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt "SLESCreateGrantLambdaFunction.Arn"
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt "SLESCaptureControlTowerLifeCycleEvents.Arn"
+
+  TriggerLambda:
+    Type: 'Custom::TriggerLambda'
+    Properties:
+      ServiceToken: !GetAtt SLESCreateGrantLambdaFunction.Arn
