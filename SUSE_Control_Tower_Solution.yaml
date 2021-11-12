@@ -14,11 +14,11 @@ Parameters:
     Default: '36451a0a-c7b9-4ee2-bb36-1192921c6337'
   SourceS3BucketName:
     Type: String
-    Default: vinjak-outbox
+    Default: suse-aws-control-tower-integration
     Description: "S3 bucket for Quick Start assets. Use this if you want to customize your deployment. The bucket name can include numbers, lowercase letters, uppercase letters, and hyphens, but it cannot start or end with hyphens (-)."
   SourceS3KeyPrefix:
     Type: String
-    Default: mpct-sles/
+    Default: public/
     Description: "S3 key prefix to simulate a directory for Quick Start assets. Use this if you want to customize your deployment. The prefix can include numbers, lowercase letters, uppercase letters, hyphens (-), and forward slashes (/). For more information, see https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingMetadata.html."
 Metadata:
   'AWS::CloudFormation::Interface':
@@ -231,7 +231,7 @@ Resources:
                   - 'license-manager:GetLicense'
                   - 'license-manager:ListLicenseVersions'
                   - 'license-manager:GetGrant'
-                Resource: 
+                Resource:
                   - 'arn:aws:license-manager::*:grant:*'
                   - 'arn:aws:license-manager::*:license:*'
                   - 'arn:aws:license-manager:*:*:license-configuration:*'
