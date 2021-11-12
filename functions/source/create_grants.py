@@ -11,7 +11,7 @@ from botocore.exceptions import ClientError
 
 import cfnresponse
 
-LM = boto3.client("license-manager")
+LM = boto3.client("license-manager", region_name='us-east-1')
 ORG = boto3.client("organizations")
 SSM = boto3.client("ssm")
 STS = boto3.client('sts')
@@ -120,7 +120,7 @@ def create_grant(account, sku, reg='us-east-1'):
     if not grant_exists(account, sku):
         l_arn = get_grants(g_type='recieved', product_sku=sku)[0]['LicenseArn']
         token = str(uuid1())
-        grant_name = 'Grant for' + account
+        grant_name = 'Grant for ' + account
         ops = ['CheckoutLicense', 'CheckInLicense']
         ops += ['ExtendConsumptionLicense', 'ListPurchasedLicenses']
         try:
@@ -230,12 +230,21 @@ def process_cft_event(event, context, account_list, sku):
 
     if result:
         LOG.info('SUCCESS: %s', result)
-        cfnresponse.send(event, context, cfnresponse.SUCCESS,
-                            output, "CustomResourcePhysicalID")
+        send_signal(event, context, status='SUCCESS', data=output)
     else:
         LOG.info('FAILED: %s', result)
-        cfnresponse.send(event, context, cfnresponse.FAILED,
-                            output, "CustomResourcePhysicalID")
+        send_signal(event, context, data=output)
+
+
+def send_signal(event, context, status="FAILED", data=None,
+                 rsrc_id='CustomResourcePhysicalID'):
+    '''
+    Send suscess/failure signal to cfnresponse
+    '''
+
+    if not data:
+        data = list()
+    cfnresponse.send(event, context, status, data, rsrc_id)
 
 
 def lambda_handler(event, context):
@@ -243,24 +252,35 @@ def lambda_handler(event, context):
     Lambda handler
     '''
 
+    event_origin = None
     LOG.info('Event: %s, Context: %s', event, context)
+
+    if 'detail' in event:
+        event_origin = 'lc_event'
+    elif 'RequestType' in event:
+        event_origin = 'cft'
+
     try:
         ou_list = SSM.get_parameter(Name=environ['OU_PRM'])['Parameter']['Value'].split(',')
         sku = SSM.get_parameter(Name=environ['SKU_PRM'])['Parameter']['Value']
-        account_list = []
-        LOG.info('OUS:%s, SKU:%s', ou_list, sku)
-        for ou_id in ou_list:
-            account_list += accounts_in_ou(ou_id)
     except Exception as exe:
-        LOG.error('%s', str(exe))
-        raise
+        if event_origin == 'cft':
+            send_signal(event, context, data=[str(exe)])
+        else:
+            LOG.error('%s', str(exe))
 
-    if not len(get_grants(g_type='recieved', product_sku=sku)) > 0:
-        raise Exception("No Subscription")
+    account_list = []
+    LOG.info('OUS:%s, SKU:%s', ou_list, sku)
 
-    if 'detail' in event:
+    for ou_id in ou_list:
+        account_list += accounts_in_ou(ou_id)
+
+    if event_origin == 'cft':
+        if not len(get_grants(g_type='recieved', product_sku=sku)) > 0:
+            send_signal(event, context, data=['NO_SUBSCRIPTION'])
+        else:
+            process_cft_event(event, context, account_list, sku)
+    elif event_origin == 'lc_event':
         process_lifecycle_event(event, account_list, sku)
-    elif 'RequestType' in event:
-        process_cft_event(event, context, account_list, sku)
     else:
-        LOG.info('Unsupported Event:%s', event)
+        LOG.error('Unsupported Event: %s', event)
