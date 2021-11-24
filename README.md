@@ -70,5 +70,6 @@ Erfüllungsort/Legal Venue: Nürnberg
 
 SUPPORT:
 
-This CT integration comes with no support entitlement, but if you have any queries, please contact the SUSE team at:
+This CT integration comes with no support entitlement, but if you have any queries, please raise an issue for the project via github or contact the SUSE team at:
+
 aws@suse.com
