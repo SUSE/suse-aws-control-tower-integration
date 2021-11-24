@@ -31,7 +31,35 @@ To get started with AWS Control Tower, check out the Control Tower User Guide
 For further information on this integration, how to deploy and use, please view the documentation on the marketplace website.
 https://aws.amazon.com/marketplace/solutions/control-tower/operational-intelligence
 
-Please check the LICENSE information.
+LICENSE:
 
-Or contact SUSE.
-email:  aws@suse.com
+Copyright (C) 2021 SUSE LLC
+
+This library is free software; you can redistribute it and/or
+modify it under the terms of the GNU Lesser General Public
+License as published by the Free Software Foundation; either
+version 2.1 of the License, or (at your option) any later version.
+
+This library is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public
+License along with this library; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+
+SUSE Software Solutions Germany GmbH
+Maxfeldstr. 5
+D-90409 Nürnberg
+Tel: +49 (0)911 740 53 - 0
+Email: info@suse.com
+Registrierung/Registration Number: HRB 36809 AG Nürnberg
+Geschäftsführer/Managing Director: Felix Imendörffer
+Steuernummer/Sales Tax ID: DE 192 167 791
+Erfüllungsort/Legal Venue: Nürnberg
+© 2021 GitHub, Inc.
+
+SUPPORT:
+This CT integration comes with no support entitlement, but if you have any queries, please contact the SUSE team at:
+aws@suse.com
