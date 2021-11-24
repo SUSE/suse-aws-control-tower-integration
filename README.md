@@ -15,20 +15,28 @@ the grants when a new AWS Account is created in those OUs using Account Factory.
 This solution is delivered as an AWS CloudFormation template for easy deployment into the environment.
 
 Using this solution, you can:
+
 ✓ Specify a set of Organizational Units that you like create grant for.
+
 ✓ Automatically create the grants for both existing accounts and new accounts.
+
 ✓ Quickly deploy SLES for SAP instances within these Amazon Machine IDs (AMIs) in the managed
 accounts
 
+
 Pre-requisites
+
 • AWS Control Tower should be deployed and working correctly.
+
 • An active subscription to SUSE Linux Enterprise Server for SAP Applications 15 SP1 in the
 management account.
+
 • The SUSE Integration solution should be downloaded from the SUSE GitHub Repository.
+
 
 To get started with AWS Control Tower, check out the Control Tower User Guide
 
-For further information on this integration, how to deploy and use, please view the documentation on the marketplace website.
+For further information on this integration, how to deploy and use, please view the SUSE documentation linked from the AWS Marketplace website.
 https://aws.amazon.com/marketplace/solutions/control-tower/operational-intelligence
 
 LICENSE:
@@ -61,5 +69,6 @@ Erfüllungsort/Legal Venue: Nürnberg
 © 2021 GitHub, Inc.
 
 SUPPORT:
+
 This CT integration comes with no support entitlement, but if you have any queries, please contact the SUSE team at:
 aws@suse.com
