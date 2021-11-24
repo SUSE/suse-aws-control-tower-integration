@@ -53,19 +53,18 @@ You should have received a copy of the GNU Lesser General Public
 License along with this library; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
-SUSE Software Solutions Germany GmbH
-Maxfeldstr. 5
-D-90409 Nürnberg
-Tel: +49 (0)911 740 53 - 0
-Email: info@suse.com
-Registrierung/Registration Number: HRB 36809 AG Nürnberg
-Geschäftsführer/Managing Director: Felix Imendörffer
-Steuernummer/Sales Tax ID: DE 192 167 791
-Erfüllungsort/Legal Venue: Nürnberg
-© 2021 GitHub, Inc.
+SUSE Software Solutions Germany GmbH<br/>
+Maxfeldstr. 5<br/>
+D-90409 Nürnberg<br/>
+Tel: +49 (0)911 740 53 - 0<br/>
+Email: info@suse.com<br/>
+Registrierung/Registration Number: HRB 36809 AG Nürnberg<br/>
+Geschäftsführer/Managing Director: Felix Imendörffer<br/>
+Steuernummer/Sales Tax ID: DE 192 167 791<br/>
+Erfüllungsort/Legal Venue: Nürnberg<br/>
+© 2021 GitHub, Inc.<br/>
 
 SUPPORT:
 
-This CT integration comes with no support entitlement, but if you have any queries, please raise an issue for the project via github or contact the SUSE team at:
-
+This CT integration comes with no support entitlement, but if you have any queries, please raise an issue for the project via github or contact the SUSE team at:<br/>
 aws@suse.com
